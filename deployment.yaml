@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homework-deployment
+  namespace: homework
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: homework
+  template:
+    metadata:
+      labels:
+        app: homework
+    spec:
+      nodeSelector:
+        homework: "true"
+      containers:
+      - name: web-server
+        image: nginx:alpine
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: homework-volume
+          mountPath: /homework
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - test -f /homework/index.html
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "rm -f /homework/index.html"]
+      initContainers:
+      - name: init-container
+        image: busybox
+        command: ["sh", "-c", "mkdir -p /init && echo 'Hello, my name is Super Carrot' > /init/index.html"]
+        volumeMounts:
+        - name: homework-volume
+          mountPath: /init
+      volumes:
+      - name: homework-volume
+        emptyDir: {}
