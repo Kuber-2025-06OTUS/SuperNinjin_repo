@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homework-deployment
+  namespace: homework
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: homework
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: homework
+    spec:
+      initContainers:
+      - name: init-container
+        image: busybox
+        command: ['sh', '-c', 'wget http://oldavista.com/ -O /init/index.html']
+        volumeMounts:
+        - name: homework-volume
+          mountPath: /init
+      volumes:
+      - name: homework-volume
+        emptyDir: {}
+      containers:
+      - name: nginx-container
+        image: nginx:1.29
+        ports:
+        - containerPort: 8000
+          name: http
+        lifecycle:
+          preStop:
+            exec:
+              command: ['sh', '-c', 'rm', '/homework/index.html']
+        volumeMounts:
+        - name: homework-volume
+          mountPath: /homework
+        - name: config
+          mountPath: /etc/nginx/conf.d
+          readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /index.html
+            port: 8000
+          initialDelaySeconds: 1
+          periodSeconds: 5
+      volumes:
+      - name: homework-volume
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: nginx-config
+          items:
+          - key: default.conf
+            path: default.conf
